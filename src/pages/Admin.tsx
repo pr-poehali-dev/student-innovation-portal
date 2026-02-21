@@ -1,294 +1,273 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Icon from "@/components/ui/icon";
-import { api, Entity, AnyItem } from "@/lib/api";
+import {
+  adminLogin,
+  fetchItems,
+  createItem,
+  updateItem,
+  deleteItem,
+  type ItemType,
+  type AnyItem,
+  type Competition,
+  type Grant,
+  type Event,
+} from "@/api/items";
 
-const ENTITY_CONFIG: Record<Entity, {
-  label: string;
-  icon: string;
-  fields: { key: string; label: string; placeholder?: string; type?: string }[];
-}> = {
-  competitions: {
-    label: "Конкурсы",
-    icon: "Trophy",
-    fields: [
-      { key: "title", label: "Название", placeholder: "Название конкурса" },
-      { key: "description", label: "Описание", placeholder: "Краткое описание", type: "textarea" },
-      { key: "deadline", label: "Дедлайн", type: "date" },
-      { key: "prize", label: "Призовой фонд", placeholder: "500 000 ₽" },
-      { key: "organizer", label: "Организатор", placeholder: "Фонд содействия инновациям" },
-      { key: "url", label: "Ссылка", placeholder: "https://..." },
-    ],
-  },
-  grants: {
-    label: "Гранты",
-    icon: "Banknote",
-    fields: [
-      { key: "title", label: "Название", placeholder: "Название гранта" },
-      { key: "description", label: "Описание", placeholder: "Краткое описание", type: "textarea" },
-      { key: "amount", label: "Сумма", placeholder: "до 6 млн ₽/год" },
-      { key: "deadline", label: "Дедлайн", type: "date" },
-      { key: "organizer", label: "Организатор", placeholder: "РНФ" },
-      { key: "url", label: "Ссылка", placeholder: "https://..." },
-    ],
-  },
-  events: {
-    label: "Мероприятия",
-    icon: "Calendar",
-    fields: [
-      { key: "title", label: "Название", placeholder: "Название мероприятия" },
-      { key: "description", label: "Описание", placeholder: "Краткое описание", type: "textarea" },
-      { key: "event_date", label: "Дата", type: "date" },
-      { key: "event_time", label: "Время", placeholder: "14:00" },
-      { key: "location", label: "Место", placeholder: "Корпус 3, зал 301" },
-      { key: "url", label: "Ссылка", placeholder: "https://..." },
-    ],
-  },
-};
+const TABS: { key: ItemType; label: string }[] = [
+  { key: "competitions", label: "Конкурсы" },
+  { key: "grants", label: "Гранты" },
+  { key: "events", label: "Мероприятия" },
+];
 
-const EMPTY_FORM: Record<string, string> = {
-  title: "", description: "", deadline: "", prize: "", organizer: "", url: "",
-  amount: "", event_date: "", event_time: "", location: "", type: "event",
-};
-
-function LoginScreen({ onLogin }: { onLogin: (token: string) => void }) {
-  const [token, setToken] = useState("");
-  const [error, setError] = useState(false);
+function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(false);
     setLoading(true);
-    const res = await api.list("competitions");
+    setError("");
+    const res = await adminLogin(password);
     setLoading(false);
-    if (Array.isArray(res)) {
-      onLogin(token);
+    if ("token" in res) {
+      onLogin(res.token);
     } else {
-      setError(true);
+      setError(res.error || "Ошибка входа");
     }
   };
 
   return (
-    <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted/40">
       <Card className="w-full max-w-sm">
-        <CardHeader className="text-center pb-2">
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-            <Icon name="ShieldCheck" size={24} className="text-primary" />
+        <CardHeader className="text-center">
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
+            <Icon name="Lock" size={20} className="text-primary" />
           </div>
-          <CardTitle className="text-xl">Админ-панель</CardTitle>
-          <p className="text-sm text-muted-foreground">Управление контентом портала инноваций</p>
+          <CardTitle>Вход в панель управления</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">Пароль доступа</label>
+              <Label htmlFor="password">Пароль</Label>
               <Input
+                id="password"
                 type="password"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="Введите ADMIN_TOKEN"
-                className={error ? "border-red-400" : ""}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Введите пароль"
+                className="mt-1"
               />
-              {error && <p className="text-xs text-red-500 mt-1">Неверный токен</p>}
             </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Проверка..." : "Войти"}
+              {loading ? "Вход..." : "Войти"}
             </Button>
           </form>
-          <div className="mt-4 text-center">
-            <a href="/" className="text-xs text-muted-foreground hover:text-primary transition-colors">← Вернуться на сайт</a>
-          </div>
         </CardContent>
       </Card>
     </div>
   );
 }
 
+type FormData = Record<string, string>;
+
+const FIELDS: Record<ItemType, { key: string; label: string; type?: string }[]> = {
+  competitions: [
+    { key: "title", label: "Название" },
+    { key: "description", label: "Описание", type: "textarea" },
+    { key: "deadline", label: "Дедлайн", type: "date" },
+    { key: "prize", label: "Призовой фонд" },
+    { key: "organizer", label: "Организатор" },
+    { key: "url", label: "Ссылка" },
+  ],
+  grants: [
+    { key: "title", label: "Название" },
+    { key: "description", label: "Описание", type: "textarea" },
+    { key: "amount", label: "Сумма гранта" },
+    { key: "deadline", label: "Дедлайн", type: "date" },
+    { key: "organizer", label: "Организатор" },
+    { key: "url", label: "Ссылка" },
+  ],
+  events: [
+    { key: "title", label: "Название" },
+    { key: "description", label: "Описание", type: "textarea" },
+    { key: "event_date", label: "Дата", type: "date" },
+    { key: "event_time", label: "Время (напр. 14:00)" },
+    { key: "location", label: "Место проведения" },
+    { key: "url", label: "Ссылка" },
+  ],
+};
+
 function ItemForm({
-  entity,
-  editItem,
+  type,
+  initial,
+  onSave,
+  onClose,
   token,
-  onSaved,
-  onCancel,
 }: {
-  entity: Entity;
-  editItem?: AnyItem | null;
+  type: ItemType;
+  initial?: AnyItem;
+  onSave: () => void;
+  onClose: () => void;
   token: string;
-  onSaved: () => void;
-  onCancel: () => void;
 }) {
-  const config = ENTITY_CONFIG[entity];
-  const [form, setForm] = useState<Record<string, string>>(
-    editItem ? { ...EMPTY_FORM, ...(editItem as Record<string, string>) } : { ...EMPTY_FORM }
-  );
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [data, setData] = useState<FormData>(() => {
+    const d: FormData = { status: "active" };
+    if (initial) {
+      Object.entries(initial).forEach(([k, v]) => {
+        if (v !== null && v !== undefined) d[k] = String(v);
+      });
+    }
+    return d;
+  });
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setForm(editItem ? { ...EMPTY_FORM, ...(editItem as Record<string, string>) } : { ...EMPTY_FORM });
-  }, [editItem, entity]);
+  const set = (k: string, v: string) => setData((p) => ({ ...p, [k]: v }));
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title.trim()) { setError("Название обязательно"); return; }
-    setSaving(true);
-    setError("");
-    const payload: Record<string, string> = {};
-    config.fields.forEach((f) => { if (form[f.key]) payload[f.key] = form[f.key]; });
-    const it = editItem as (AnyItem & { id: number }) | null;
-    const res = it
-      ? await api.update(entity, it.id, payload, token)
-      : await api.create(entity, payload, token);
-    setSaving(false);
-    if (res?.error) { setError(res.error); return; }
-    onSaved();
-  };
-
-  return (
-    <Card className="border-primary/20">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">{editItem ? "Редактировать" : "Добавить"} запись</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {config.fields.map((field) => (
-            <div key={field.key}>
-              <label className="text-sm font-medium text-foreground block mb-1">{field.label}</label>
-              {field.type === "textarea" ? (
-                <Textarea
-                  value={form[field.key] || ""}
-                  onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
-                  placeholder={field.placeholder}
-                  rows={2}
-                />
-              ) : (
-                <Input
-                  type={field.type || "text"}
-                  value={form[field.key] || ""}
-                  onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
-                  placeholder={field.placeholder}
-                />
-              )}
-            </div>
-          ))}
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <div className="flex gap-2 pt-1">
-            <Button type="submit" disabled={saving} size="sm">
-              {saving ? "Сохранение..." : "Сохранить"}
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={onCancel}>Отмена</Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
-
-function EntityTab({ entity, token }: { entity: Entity; token: string }) {
-  const [items, setItems] = useState<AnyItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editItem, setEditItem] = useState<AnyItem | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-
-  const load = () => {
+  const handleSave = async () => {
+    if (!data.title?.trim()) return;
     setLoading(true);
-    api.list(entity, "all").then((res) => {
-      setItems(Array.isArray(res) ? res.filter((r) => r.status !== "deleted") : []);
-      setLoading(false);
-    });
-  };
-
-  useEffect(() => { load(); }, [entity]);
-
-  const handleDelete = async (id: number) => {
-    if (!confirm("Удалить запись?")) return;
-    setDeletingId(id);
-    await api.remove(entity, id, token);
-    setDeletingId(null);
-    load();
-  };
-
-  const handleEdit = (item: AnyItem) => {
-    setEditItem(item);
-    setShowForm(true);
-  };
-
-  const handleSaved = () => {
-    setShowForm(false);
-    setEditItem(null);
-    load();
-  };
-
-  const getSubtitle = (item: AnyItem) => {
-    const e = item as Record<string, string>;
-    return e.deadline || e.event_date || e.organizer || e.amount || e.prize || "";
+    if (initial) {
+      await updateItem(type, (initial as AnyItem & { id: number }).id, data, token);
+    } else {
+      await createItem(type, data, token);
+    }
+    setLoading(false);
+    onSave();
   };
 
   return (
     <div className="space-y-4">
-      {!showForm && (
+      {FIELDS[type].map((f) => (
+        <div key={f.key}>
+          <Label htmlFor={f.key}>{f.label}</Label>
+          {f.type === "textarea" ? (
+            <Textarea
+              id={f.key}
+              value={data[f.key] || ""}
+              onChange={(e) => set(f.key, e.target.value)}
+              className="mt-1"
+              rows={3}
+            />
+          ) : (
+            <Input
+              id={f.key}
+              type={f.type || "text"}
+              value={data[f.key] || ""}
+              onChange={(e) => set(f.key, e.target.value)}
+              className="mt-1"
+            />
+          )}
+        </div>
+      ))}
+      <div>
+        <Label>Статус</Label>
+        <Select value={data.status || "active"} onValueChange={(v) => set("status", v)}>
+          <SelectTrigger className="mt-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Активный</SelectItem>
+            <SelectItem value="archived">Архивный</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose}>Отмена</Button>
+        <Button onClick={handleSave} disabled={loading || !data.title?.trim()}>
+          {loading ? "Сохранение..." : "Сохранить"}
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+function ItemsTable({
+  type,
+  token,
+}: {
+  type: ItemType;
+  token: string;
+}) {
+  const [items, setItems] = useState<AnyItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editItem, setEditItem] = useState<AnyItem | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    const data = await fetchItems(type, token);
+    setItems(data);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [type]);
+
+  const handleDelete = async (id: number) => {
+    await deleteItem(type, id, token);
+    setDeleteId(null);
+    load();
+  };
+
+  const getSubtitle = (item: AnyItem) => {
+    if (type === "competitions") return (item as Competition).organizer || "";
+    if (type === "grants") return (item as Grant).amount || "";
+    return (item as Event).event_date || "";
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <p className="text-sm text-muted-foreground">{items.length} записей</p>
         <Button size="sm" onClick={() => { setEditItem(null); setShowForm(true); }}>
-          <Icon name="Plus" size={14} className="mr-1.5" />
+          <Icon name="Plus" size={16} className="mr-2" />
           Добавить
         </Button>
-      )}
-
-      {showForm && (
-        <ItemForm
-          entity={entity}
-          editItem={editItem}
-          token={token}
-          onSaved={handleSaved}
-          onCancel={() => { setShowForm(false); setEditItem(null); }}
-        />
-      )}
+      </div>
 
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />)}
-        </div>
+        <div className="text-center py-8 text-muted-foreground">Загрузка...</div>
       ) : items.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Icon name="Inbox" size={32} className="mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Нет записей. Добавьте первую!</p>
-        </div>
+        <div className="text-center py-8 text-muted-foreground">Нет записей</div>
       ) : (
         <div className="space-y-2">
           {items.map((item) => {
             const it = item as AnyItem & { id: number };
-            const subtitle = getSubtitle(item);
             return (
               <div
                 key={it.id}
-                className="flex items-center justify-between gap-3 p-4 bg-white border border-border/60 rounded-lg hover:shadow-sm transition-shadow"
+                className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-white hover:bg-muted/20 transition-colors"
               >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-sm text-foreground truncate">{it.title}</p>
-                    <Badge variant={it.status === "active" ? "default" : "secondary"} className="text-xs shrink-0">
-                      {it.status === "active" ? "Активен" : it.status}
-                    </Badge>
-                  </div>
-                  {subtitle && <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{it.title}</p>
+                  <p className="text-xs text-muted-foreground truncate">{getSubtitle(item)}</p>
                 </div>
-                <div className="flex gap-1 shrink-0">
-                  <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} className="h-8 w-8 p-0">
+                <div className="flex items-center gap-2 ml-4">
+                  <Badge variant={it.status === "active" ? "default" : "secondary"} className="text-xs">
+                    {it.status === "active" ? "Активный" : it.status === "deleted" ? "Удалён" : "Архив"}
+                  </Badge>
+                  <Button size="sm" variant="ghost" onClick={() => { setEditItem(item); setShowForm(true); }}>
                     <Icon name="Pencil" size={14} />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(it.id)}
-                    disabled={deletingId === it.id}
-                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                  >
+                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(it.id)}>
                     <Icon name="Trash2" size={14} />
                   </Button>
                 </div>
@@ -297,64 +276,89 @@ function EntityTab({ entity, token }: { entity: Entity; token: string }) {
           })}
         </div>
       )}
+
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editItem ? "Редактировать" : "Добавить запись"}</DialogTitle>
+          </DialogHeader>
+          {showForm && (
+            <ItemForm
+              type={type}
+              initial={editItem || undefined}
+              token={token}
+              onSave={() => { setShowForm(false); load(); }}
+              onClose={() => setShowForm(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Удалить запись?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Запись будет скрыта с сайта.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>Отмена</Button>
+            <Button variant="destructive" onClick={() => deleteId && handleDelete(deleteId)}>Удалить</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 const Admin = () => {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("admin_token"));
+  const [token, setToken] = useState(() => sessionStorage.getItem("admin_token") || "");
+  const navigate = useNavigate();
 
   const handleLogin = (t: string) => {
-    localStorage.setItem("admin_token", t);
+    sessionStorage.setItem("admin_token", t);
     setToken(t);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("admin_token");
-    setToken(null);
+    sessionStorage.removeItem("admin_token");
+    setToken("");
   };
 
-  if (!token) return <LoginScreen onLogin={handleLogin} />;
+  if (!token) return <LoginForm onLogin={handleLogin} />;
 
   return (
     <div className="min-h-screen bg-muted/40">
-      <header className="bg-white border-b border-border/60 sticky top-0 z-10">
-        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Icon name="Lightbulb" size={14} className="text-primary" />
-            </div>
-            <span className="font-semibold text-sm text-foreground">Портал инноваций — Админ</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <a href="/" target="_blank" className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
-              <Icon name="ExternalLink" size={12} /> Открыть сайт
-            </a>
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-xs h-7">
-              <Icon name="LogOut" size={12} className="mr-1" />Выйти
-            </Button>
-          </div>
+      <header className="bg-white border-b border-border/60 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
+            <Icon name="ArrowLeft" size={16} className="mr-2" />
+            На сайт
+          </Button>
+          <span className="font-semibold text-foreground">Панель управления</span>
         </div>
+        <Button variant="outline" size="sm" onClick={handleLogout}>
+          <Icon name="LogOut" size={14} className="mr-2" />
+          Выйти
+        </Button>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Управление контентом</h1>
-          <p className="text-sm text-muted-foreground mt-1">Добавляйте и редактируйте конкурсы, гранты и мероприятия</p>
-        </div>
-
+      <main className="container mx-auto px-4 py-8 max-w-4xl">
         <Tabs defaultValue="competitions">
           <TabsList className="mb-6">
-            {(Object.keys(ENTITY_CONFIG) as Entity[]).map((e) => (
-              <TabsTrigger key={e} value={e} className="flex items-center gap-1.5">
-                <Icon name={ENTITY_CONFIG[e].icon} size={14} />
-                {ENTITY_CONFIG[e].label}
-              </TabsTrigger>
+            {TABS.map((t) => (
+              <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
             ))}
           </TabsList>
-          {(Object.keys(ENTITY_CONFIG) as Entity[]).map((e) => (
-            <TabsContent key={e} value={e}>
-              <EntityTab entity={e} token={token} />
+          {TABS.map((t) => (
+            <TabsContent key={t.key} value={t.key}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">{t.label}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ItemsTable type={t.key} token={token} />
+                </CardContent>
+              </Card>
             </TabsContent>
           ))}
         </Tabs>
