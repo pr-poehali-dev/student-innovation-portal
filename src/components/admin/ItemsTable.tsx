@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import func2url from "../../../backend/func2url.json";
 import Icon from "@/components/ui/icon";
 
-const API = import.meta.env.VITE_INNOVATIONS_API_URL;
+const API = func2url["innovations-api"];
 
 interface Props {
   entity: string;

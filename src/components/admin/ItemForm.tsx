@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import func2url from "../../../backend/func2url.json";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Icon from "@/components/ui/icon";
 
-const API = import.meta.env.VITE_INNOVATIONS_API_URL;
+const API = func2url["innovations-api"];
 
 interface Props {
   entity: string;

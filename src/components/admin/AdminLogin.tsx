@@ -3,6 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Icon from "@/components/ui/icon";
+import func2url from "../../../backend/func2url.json";
+
+const API = func2url["innovations-api"];
 
 interface Props {
   onLogin: (token: string) => void;
