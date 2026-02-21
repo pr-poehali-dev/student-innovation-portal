@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Icon from "@/components/ui/icon";
+import { useCompetitions, useGrants, useEvents } from "@/hooks/useContent";
 
 type EventType = "contest" | "grant" | "event";
 
@@ -12,22 +13,8 @@ interface CalendarEvent {
   title: string;
   type: EventType;
   description: string;
+  url?: string;
 }
-
-const events: CalendarEvent[] = [
-  { date: new Date(2026, 1, 25), title: "Дедлайн УМНИК — подача заявок", type: "contest", description: "Финальный срок подачи заявок на конкурс УМНИК" },
-  { date: new Date(2026, 2, 5), title: "Форум «Инновации и бизнес»", type: "event", description: "Ежегодный форум с участием партнёров" },
-  { date: new Date(2026, 2, 10), title: "Открытие приёма грантов РНФ", type: "grant", description: "Старт приёма заявок на гранты Российского научного фонда" },
-  { date: new Date(2026, 2, 15), title: "Дедлайн «Студенческий стартап»", type: "contest", description: "Последний день подачи на программу студенческих стартапов" },
-  { date: new Date(2026, 2, 20), title: "Вебинар: как подать грант", type: "event", description: "Онлайн-семинар по подготовке грантовых заявок" },
-  { date: new Date(2026, 2, 28), title: "Хакатон TechStorm", type: "event", description: "48-часовой хакатон по разработке инновационных решений" },
-  { date: new Date(2026, 3, 1), title: "Грант Минобрнауки", type: "grant", description: "Дедлайн подачи на грантовую программу Минобрнауки" },
-  { date: new Date(2026, 3, 10), title: "Демо-день Акселератора", type: "event", description: "Презентация проектов участников акселератора" },
-  { date: new Date(2026, 3, 15), title: "НТИ — регистрация", type: "contest", description: "Открытие регистрации на Национальную технологическую олимпиаду" },
-  { date: new Date(2026, 3, 25), title: "Грант ФНТП", type: "grant", description: "Дедлайн ФНТП — Приоритет 2030" },
-  { date: new Date(2026, 4, 12), title: "День открытых дверей УИиП", type: "event", description: "Презентация работы Управления инноваций и партнёрства" },
-  { date: new Date(2026, 4, 20), title: "Инновационный прорыв", type: "contest", description: "Крайний срок подачи проектов на конкурс" },
-];
 
 const typeConfig: Record<EventType, { label: string; color: string; dotColor: string }> = {
   contest: { label: "Конкурсы", color: "bg-blue-100 text-blue-800 hover:bg-blue-200", dotColor: "bg-blue-500" },
@@ -35,13 +22,42 @@ const typeConfig: Record<EventType, { label: string; color: string; dotColor: st
   event: { label: "Мероприятия", color: "bg-purple-100 text-purple-800 hover:bg-purple-200", dotColor: "bg-purple-500" },
 };
 
+function parseDate(str?: string): Date | null {
+  if (!str) return null;
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 const EventCalendar = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [filter, setFilter] = useState<"all" | EventType>("all");
 
+  const { data: competitions = [], isLoading: lc } = useCompetitions();
+  const { data: grants = [], isLoading: lg } = useGrants();
+  const { data: events = [], isLoading: le } = useEvents();
+
+  const allEvents = useMemo<CalendarEvent[]>(() => {
+    const result: CalendarEvent[] = [];
+    competitions.forEach((c) => {
+      const date = parseDate(c.deadline);
+      if (date) result.push({ date, title: c.title, type: "contest", description: c.description || "", url: c.url });
+    });
+    grants.forEach((g) => {
+      const date = parseDate(g.deadline);
+      if (date) result.push({ date, title: g.title, type: "grant", description: g.description || "", url: g.url });
+    });
+    events.forEach((e) => {
+      const date = parseDate(e.event_date);
+      if (date) result.push({ date, title: e.title, type: "event", description: e.description || "", url: e.url });
+    });
+    return result.sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [competitions, grants, events]);
+
+  const isLoading = lc || lg || le;
+
   const filteredEvents = useMemo(() => {
-    return events.filter((e) => filter === "all" || e.type === filter);
-  }, [filter]);
+    return allEvents.filter((e) => filter === "all" || e.type === filter);
+  }, [allEvents, filter]);
 
   const eventsForDate = useMemo(() => {
     if (!selectedDate) return filteredEvents.slice(0, 5);
@@ -53,20 +69,10 @@ const EventCalendar = () => {
     );
   }, [selectedDate, filteredEvents]);
 
-  const eventDates = useMemo(() => {
-    return filteredEvents.map((e) => e.date);
-  }, [filteredEvents]);
+  const eventDates = useMemo(() => filteredEvents.map((e) => e.date), [filteredEvents]);
 
-  const modifiers = {
-    hasEvent: eventDates,
-  };
-
-  const modifiersStyles = {
-    hasEvent: {
-      fontWeight: 700,
-      position: "relative" as const,
-    },
-  };
+  const modifiers = { hasEvent: eventDates };
+  const modifiersStyles = { hasEvent: { fontWeight: 700, position: "relative" as const } };
 
   return (
     <section id="calendar" className="bg-muted/40 py-16">
@@ -136,7 +142,13 @@ const EventCalendar = () => {
               )}
             </div>
 
-            {eventsForDate.length === 0 ? (
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-24 bg-muted/50 rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : eventsForDate.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="p-8 text-center">
                   <Icon name="CalendarOff" size={32} className="text-muted-foreground/40 mx-auto mb-3" />
@@ -150,14 +162,22 @@ const EventCalendar = () => {
                   <Card key={idx} className="border-border/60 hover:shadow-md transition-shadow">
                     <CardHeader className="p-4 pb-2">
                       <div className="flex items-start justify-between gap-3">
-                        <CardTitle className="text-base font-semibold leading-snug">{event.title}</CardTitle>
+                        <CardTitle className="text-base font-semibold leading-snug">
+                          {event.url ? (
+                            <a href={event.url} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+                              {event.title}
+                            </a>
+                          ) : event.title}
+                        </CardTitle>
                         <Badge variant="secondary" className={`shrink-0 text-xs ${cfg.color}`}>
                           {cfg.label}
                         </Badge>
                       </div>
                     </CardHeader>
                     <CardContent className="px-4 pb-4 pt-0">
-                      <p className="text-sm text-muted-foreground mb-2">{event.description}</p>
+                      {event.description && (
+                        <p className="text-sm text-muted-foreground mb-2">{event.description}</p>
+                      )}
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Icon name="Clock" size={12} />
                         {event.date.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}

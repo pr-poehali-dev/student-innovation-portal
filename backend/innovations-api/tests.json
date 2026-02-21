@@ -1,0 +1,33 @@
+{
+  "tests": [
+    {
+      "name": "Ping",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"status": "ok"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get competitions",
+      "method": "GET",
+      "path": "/?entity=competitions",
+      "expectedStatus": 200,
+      "bodyMatcher": "array"
+    },
+    {
+      "name": "Get grants",
+      "method": "GET",
+      "path": "/?entity=grants",
+      "expectedStatus": 200,
+      "bodyMatcher": "array"
+    },
+    {
+      "name": "Get events",
+      "method": "GET",
+      "path": "/?entity=events",
+      "expectedStatus": 200,
+      "bodyMatcher": "array"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "tests": [
+    {
+      "name": "GET competitions",
+      "method": "GET",
+      "path": "/?type=competitions",
+      "expectedStatus": 200,
+      "bodyMatcher": "array"
+    },
+    {
+      "name": "GET grants",
+      "method": "GET",
+      "path": "/?type=grants",
+      "expectedStatus": 200,
+      "bodyMatcher": "array"
+    },
+    {
+      "name": "GET events",
+      "method": "GET",
+      "path": "/?type=events",
+      "expectedStatus": 200,
+      "bodyMatcher": "array"
+    },
+    {
+      "name": "Auth wrong password",
+      "method": "POST",
+      "path": "/?action=auth",
+      "body": {"password": "wrongpassword123"},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "Неверный пароль"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Unauthorized POST",
+      "method": "POST",
+      "path": "/?type=events",
+      "body": {"title": "Test"},
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
